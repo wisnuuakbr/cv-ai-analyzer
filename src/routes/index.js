@@ -11,4 +11,8 @@ router.get('/health', (req, res) => {
     });
 });
 
+// Upload routes
+const uploadRoutes = require('./uploadRoutes');
+router.use('/upload', uploadRoutes);
+
 module.exports = router;

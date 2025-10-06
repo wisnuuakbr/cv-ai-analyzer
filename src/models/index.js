@@ -3,6 +3,9 @@ const config = require('../config');
 
 // Import models
 const Document = require('./document');
+const EvaluationJob = require('./evaluationJob');
+const EvaluationResult = require('./evaluationResult');
+const Content = require('./content');
 
 const dbConfig = config.database;
 
@@ -22,7 +25,10 @@ const sequelize = new Sequelize(
 
 // Initialize models
 const models = {
-    Document: Document.init(sequelize)
+    Document: Document.init(sequelize),
+    EvaluationJob: EvaluationJob.init(sequelize),
+    EvaluationResult: EvaluationResult.init(sequelize),
+    Content: Content.init(sequelize)
 };
 
 // Set up associations

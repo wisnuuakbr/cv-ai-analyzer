@@ -16,17 +16,32 @@ const sequelize = new Sequelize(
 );
 
 const connectDatabase = async () => {
-    try {
-        await sequelize.authenticate();
-        logger.info('Database connection established successfully');
+    let retries = 10;
+    const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
-        if (config.server.env === 'development') {
-            await sequelize.sync({ alter: true });
-            logger.info('Database models synchronized');
+    while (retries) {
+        try {
+            await sequelize.authenticate();
+            logger.info('Database connection established successfully');
+
+            if (config.server.env === 'development') {
+                await sequelize.sync({ alter: true });
+                logger.info('Database models synchronized');
+            }
+
+            break;
+        } catch (error) {
+            retries -= 1;
+            logger.warn(`Database not ready (retries left: ${retries})`);
+            logger.warn(error.message);
+
+            if (!retries) {
+                logger.error('Unable to connect to database after multiple attempts');
+                throw error;
+            }
+
+            await delay(10000);
         }
-    } catch (error) {
-        logger.error('Unable to connect to database:', error);
-        throw error;
     }
 };
 

@@ -20,6 +20,30 @@ module.exports = {
             idle: 10000
         }
     },
+    redis: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT) || 6379,
+        password: process.env.REDIS_PASSWORD || undefined,
+        db: parseInt(process.env.REDIS_DB) || 0,
+        maxRetriesPerRequest: 3,
+    },
+    queue: {
+        evaluationQueueName: 'evaluation-jobs',
+        defaultJobOptions: {
+            attempts: 3,
+            backoff: {
+                type: 'exponential',
+                delay: 2000,
+            },
+            removeOnComplete: {
+                count: 100, // Keep last 100 completed jobs
+                age: 86400, // Keep for 24 hours
+            },
+            removeOnFail: {
+                count: 1000, // Keep last 1000 failed jobs
+            },
+        },
+    },
     huggingface: {
         apiKey: process.env.HUGGINGFACE_API_KEY,
         baseURL: 'https://api-inference.huggingface.co/models',

@@ -15,4 +15,12 @@ router.get('/health', (req, res) => {
 const uploadRoutes = require('./uploadRoutes');
 router.use('/upload', uploadRoutes);
 
+// Evaluation routes
+const evaluationRoutes = require('./evaluationRoutes');
+router.use('/evaluate', evaluationRoutes);
+
+// Result routes
+const resultRoutes = require('./resultRoutes');
+router.use('/result', resultRoutes);
+
 module.exports = router;

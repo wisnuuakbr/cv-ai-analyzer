@@ -1,0 +1,119 @@
+services:
+    app:
+        build: .
+        container_name: cv-ai-analyzer_app
+        restart: always
+        ports:
+            - "3000:3000"
+        volumes:
+            - .:/app
+            - /app/node_modules
+            - ./uploads:/app/uploads
+            - ./docs:/app/docs
+            - ./logs:/app/logs
+        environment:
+            - NODE_ENV=${NODE_ENV}
+            - PORT=${PORT}
+            - LOG_LEVEL=${LOG_LEVEL}
+            - DB_HOST=db
+            - DB_PORT=${DB_PORT}
+            - DB_NAME=${DB_NAME}
+            - DB_USER=${DB_USER}
+            - DB_PASSWORD=${DB_PASSWORD}
+            - REDIS_HOST=redis
+            - REDIS_PORT=${REDIS_PORT}
+            - REDIS_PASSWORD=${REDIS_PASSWORD}
+            - REDIS_DB=${REDIS_DB}
+            - QDRANT_HOST=qdrant
+            - QDRANT_PORT=${QDRANT_PORT}
+            - QDRANT_API_KEY=${QDRANT_API_KEY}
+            - QDRANT_COLLECTION_NAME=${QDRANT_COLLECTION_NAME}
+            - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+            - HUGGINGFACE_MODEL=${HUGGINGFACE_MODEL}
+            - LLM_TEMPERATURE=${LLM_TEMPERATURE}
+            - LLM_MAX_TOKENS=${LLM_MAX_TOKENS}
+            - MAX_FILE_SIZE=${MAX_FILE_SIZE}
+            - UPLOAD_DIR=${UPLOAD_DIR}
+        depends_on:
+            - db
+            - redis
+            - qdrant
+        networks:
+            - cv-ai-network
+
+    db:
+        image: mysql:8.0.30
+        container_name: cv-ai-analyzer_mysql
+        restart: always
+        ports:
+            - "3306:3306"
+        environment:
+            MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+            MYSQL_DATABASE: ${DB_NAME}
+            MYSQL_USER: ${DB_USER}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+        volumes:
+            - db-data:/var/lib/mysql
+        networks:
+            - cv-ai-network
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "mysqladmin",
+                    "ping",
+                    "-h",
+                    "localhost",
+                    "-u",
+                    "root",
+                    "-p${DB_PASSWORD}",
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 60s
+
+    redis:
+        image: redis:7-alpine
+        container_name: cv-ai-analyzer_redis
+        restart: always
+        ports:
+            - "6379:6379"
+        command: redis-server --appendonly yes
+        volumes:
+            - redis-data:/data
+        networks:
+            - cv-ai-network
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+
+    qdrant:
+        image: qdrant/qdrant:v1.2.2
+        container_name: cv-ai-analyzer_qdrant
+        restart: always
+        ports:
+            - "6333:6333"
+            - "6334:6334"
+        volumes:
+            - qdrant-data:/qdrant/storage
+        networks:
+            - cv-ai-network
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+
+volumes:
+    db-data:
+    redis-data:
+    qdrant-data:
+
+networks:
+    cv-ai-network:
+        driver: bridge

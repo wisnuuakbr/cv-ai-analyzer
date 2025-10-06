@@ -3,6 +3,7 @@ const path = require('path');
 const documentRepository = require('../repositories/documentRepository');
 const logger = require('../utils/logger');
 const { AppError } = require('../middlewares/errorHandler');
+const documentExtractionUseCase = require('./documentExtractionUseCase');
 
 class UploadUseCase {
     async uploadDocuments(files) {
@@ -37,6 +38,9 @@ class UploadUseCase {
 
             logger.info(`Documents uploaded successfully - CV: ${cvDocument.id}, Project: ${projectDocument.id}`);
 
+            // Auto extract with trigger extraction in background
+            this.triggerAutoExtraction([cvDocument.id, projectDocument.id]);
+
             return {
                 cv: {
                     id: cvDocument.id,
@@ -53,19 +57,32 @@ class UploadUseCase {
             logger.error('Error in uploadDocuments:', error);
 
             // Cleanup uploaded files if database operation fails
-            try {
-                if (files.cv && files.cv[0]) {
-                    await fs.unlink(files.cv[0].path);
-                }
-                if (files.project_report && files.project_report[0]) {
-                    await fs.unlink(files.project_report[0].path);
-                }
-            } catch (unlinkError) {
-                logger.error('Error cleaning up files:', unlinkError);
-            }
+            await this.cleanupFiles(files);
 
             throw error;
         }
+    }
+
+    // Trigger automatic extraction in background
+    async triggerAutoExtraction(documentIds) {
+        // Run in background without blocking response
+        setImmediate(async () => {
+            try {
+                logger.info('Auto-extracting documents:', documentIds);
+
+                for (const docId of documentIds) {
+                    try {
+                        await documentExtractionUseCase.extractDocument(docId);
+                        logger.info(`Auto-extraction completed for: ${docId}`);
+                    } catch (error) {
+                        logger.error(`Auto-extraction failed for ${docId}:`, error);
+                        // Continue with next document even if one fails
+                    }
+                }
+            } catch (error) {
+                logger.error('Error in auto-extraction:', error);
+            }
+        });
     }
 
     async validateDocuments(cvId, projectId) {
@@ -95,10 +112,31 @@ class UploadUseCase {
                 throw new AppError('Invalid document type for project report', 400);
             }
 
+            // Check if extraction completed
+            if (cvDoc.upload_status === 'failed' || projectDoc.upload_status === 'failed') {
+                throw new AppError('One or both documents failed to process', 400);
+            }
+
             return { cvDoc, projectDoc };
         } catch (error) {
             logger.error('Error in validateDocuments:', error);
             throw error;
+        }
+    }
+
+    // Cleanup uploaded files on error
+    async cleanupFiles(files) {
+        try {
+            if (files.cv && files.cv[0]) {
+                await fs.unlink(files.cv[0].path);
+                logger.info(`Cleaned up CV file: ${files.cv[0].filename}`);
+            }
+            if (files.project_report && files.project_report[0]) {
+                await fs.unlink(files.project_report[0].path);
+                logger.info(`Cleaned up project file: ${files.project_report[0].filename}`);
+            }
+        } catch (unlinkError) {
+            logger.error('Error cleaning up files:', unlinkError);
         }
     }
 }

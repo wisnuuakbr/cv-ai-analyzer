@@ -69,6 +69,12 @@ class Document extends Model {
             foreignKey: 'project_document_id',
             as: 'projectEvaluations'
         });
+
+        // Has one content
+        this.hasOne(models.Content, {
+            foreignKey: 'document_id',
+            as: 'content'
+        });
     }
 }
 

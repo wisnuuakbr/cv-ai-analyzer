@@ -1,5 +1,4 @@
 const logger = require('../utils/logger');
-const config = require('../config');
 
 class AppError extends Error {
     constructor(message, statusCode) {
@@ -13,7 +12,7 @@ class AppError extends Error {
 const errorHandler = (err, req, res, next) => {
     let { statusCode = 500, message } = err;
 
-    // Log error
+    // Log error with stack trace
     logger.error(`Error: ${message}`, {
         statusCode,
         stack: err.stack,
@@ -51,15 +50,16 @@ const errorHandler = (err, req, res, next) => {
         }
     }
 
+    // Joi validation error
+    if (err.name === 'ValidationError' && err.isJoi) {
+        statusCode = 400;
+        message = err.details.map(d => d.message).join(', ');
+    }
+
     const response = {
         success: false,
         message: message || 'Internal server error'
     };
-
-    // Include stack trace in development
-    if (config.server.env === 'development' && err.stack) {
-        response.stack = err.stack;
-    }
 
     res.status(statusCode).json(response);
 };

@@ -265,6 +265,15 @@ class VectorStoreUseCase {
         }
     }
 
+    // Helper methods for CV and Project scoring context retrieval
+    async searchCVScoringContext(query, limit = 5) {
+        return this.searchContext(query, 'scoring_rubric', 'cv_evaluation', limit);
+    }
+
+    async searchProjectScoringContext(query, limit = 5) {
+        return this.searchContext(query, 'scoring_rubric', 'project_evaluation', limit);
+    }
+
     // Get all reference documents in vector store
     async listReferenceDocuments() {
         try {

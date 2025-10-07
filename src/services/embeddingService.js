@@ -5,7 +5,7 @@ const logger = require('../utils/logger');
 class EmbeddingService {
     constructor() {
         this.hf = null;
-        this.model = config.huggingface.model;
+        this.model = 'sentence-transformers/all-MiniLM-L6-v2';
         this.initialized = false;
     }
 

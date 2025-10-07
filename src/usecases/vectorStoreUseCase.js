@@ -66,11 +66,6 @@ class VectorStoreUseCase {
                     description: 'Case study brief document'
                 },
                 {
-                    filename: 'cv_scoring_rubric.pdf',
-                    type: 'cv_rubric',
-                    description: 'CV evaluation scoring rubric'
-                },
-                {
                     filename: 'scoring_rubric.pdf',
                     type: 'scoring_rubric',
                     description: 'Unified scoring rubric for CV and Project evaluation',

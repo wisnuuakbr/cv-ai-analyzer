@@ -32,6 +32,7 @@
 		"db:migrate": "npx sequelize-cli db:migrate",
 		"db:create-seeder": "npx sequelize-cli seed:generate --name",
 		"db:seed": "npx sequelize-cli db:seed:all",
+		"ingest": "node scripts/ingestDocuments.js",
 		"test": "jest --coverage",
 		"test:watch": "jest --watch",
 		"test:unit": "jest --testPathPattern=__tests__ --coverage"

@@ -12,13 +12,13 @@ class RAGService {
             const jobDescContext = await vectorStoreUseCase.searchContext(
                 `${jobTitle} requirements skills experience`,
                 'job_description',
+                null,
                 3
             );
 
-            // Retrieve CV scoring rubric
-            const cvRubricContext = await vectorStoreUseCase.searchContext(
+            // Retrieve CV scoring rubric using helper method
+            const cvRubricContext = await vectorStoreUseCase.searchCVScoringContext(
                 'CV evaluation criteria technical skills experience achievements',
-                'cv_rubric',
                 2
             );
 
@@ -58,13 +58,13 @@ class RAGService {
             const caseStudyContext = await vectorStoreUseCase.searchContext(
                 'case study requirements implementation deliverables',
                 'case_study_brief',
+                null,
                 3
             );
 
-            // Retrieve project scoring rubric
-            const projectRubricContext = await vectorStoreUseCase.searchContext(
+            // Retrieve project scoring rubric using helper method
+            const projectRubricContext = await vectorStoreUseCase.searchProjectScoringContext(
                 'project evaluation criteria code quality correctness resilience',
-                'project_rubric',
                 2
             );
 

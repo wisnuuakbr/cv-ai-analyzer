@@ -22,7 +22,7 @@ module.exports = {
 					key: 'id'
 				},
 				onUpdate: 'CASCADE',
-				onDelete: 'RESTRICT'
+				onDelete: 'CASCADE'
 			},
 			project_document_id: {
 				type: Sequelize.UUID,
@@ -32,7 +32,7 @@ module.exports = {
 					key: 'id'
 				},
 				onUpdate: 'CASCADE',
-				onDelete: 'RESTRICT'
+				onDelete: 'CASCADE'
 			},
 			status: {
 				type: Sequelize.ENUM('queued', 'processing', 'completed', 'failed'),

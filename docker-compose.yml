@@ -92,7 +92,7 @@ services:
             start_period: 30s
 
     qdrant:
-        image: qdrant/qdrant:v1.2.2
+        image: qdrant/qdrant:v1.15.1
         container_name: cv-ai-analyzer_qdrant
         restart: always
         ports:

@@ -7,20 +7,55 @@ class RAGService {
     async evaluateCV(cvContent, jobTitle) {
         try {
             logger.info('Starting CV evaluation...');
+            logger.info(`Job Title: ${jobTitle}`);
+
+            // Check if vector store is initialized
+            const healthCheck = await vectorStoreUseCase.healthCheck();
+            logger.info('Vector store health:', healthCheck);
+
+            if (healthCheck.status !== 'healthy') {
+                throw new Error('Vector store is not healthy');
+            }
 
             // Retrieve relevant job description context
+            logger.info('Searching job description context...');
             const jobDescContext = await vectorStoreUseCase.searchContext(
                 `${jobTitle} requirements skills experience`,
                 'job_description',
                 null,
                 3
             );
+            logger.info(`Job description context found: ${jobDescContext.length} results`);
+
+            if (jobDescContext.length === 0) {
+                logger.warn('No job description context found! Vector store might be empty.');
+            }
 
             // Retrieve CV scoring rubric using helper method
+            logger.info('Searching CV scoring rubric context...');
             const cvRubricContext = await vectorStoreUseCase.searchCVScoringContext(
                 'CV evaluation criteria technical skills experience achievements',
-                2
+                3
             );
+            logger.info(`CV rubric context found: ${cvRubricContext.length} results`);
+
+            if (cvRubricContext.length === 0) {
+                logger.warn('No CV rubric context found! Vector store might be missing scoring_rubric data.');
+            }
+
+            // Check if we have enough context to proceed
+            const totalContextItems = jobDescContext.length + cvRubricContext.length;
+
+            if (totalContextItems === 0) {
+                logger.error('CRITICAL: No context found from vector store!');
+                logger.error('This means either:');
+                logger.error('1. Documents were not ingested properly');
+                logger.error('2. Vector store is empty');
+                logger.error('3. Search is not working');
+                logger.error('Falling back to basic evaluation...');
+
+                return this.getFallbackCVScores(cvContent);
+            }
 
             // Build context from retrieved documents
             const context = this.buildContext([
@@ -28,24 +63,50 @@ class RAGService {
                 { title: 'CV Scoring Rubric', results: cvRubricContext }
             ]);
 
+            logger.info(`Built context length: ${context.length} characters`);
+
+            if (context.length < 100) {
+                logger.warn('Context too short, might not be useful for evaluation');
+            }
+
             // Build CV summary
             const cvSummary = this.buildCVSummary(cvContent);
+            logger.info(`CV summary length: ${cvSummary.length} characters`);
 
             // Generate evaluation prompt
             const prompt = this.buildCVEvaluationPrompt(context, cvSummary, jobTitle);
+            logger.info(`Prompt length: ${prompt.length} characters`);
 
             // Get LLM evaluation
-            const evaluation = await llmService.generateTextWithRetry(prompt);
+            logger.info('Generating LLM evaluation...');
+            const evaluation = await llmService.generateTextWithRetry(prompt, {
+                maxTokens: 500,
+                temperature: 0.3
+            });
+
+            logger.info('LLM evaluation received');
+            logger.debug('LLM response preview:', evaluation.substring(0, 200));
 
             // Parse evaluation result
             const result = this.parseCVEvaluation(evaluation, cvContent);
 
-            logger.info('CV evaluation completed');
+            // Add metadata
+            result.rag_status = 'success';
+            result.context_items_used = totalContextItems;
+
+            logger.info('CV evaluation completed successfully');
             return result;
 
         } catch (error) {
             logger.error('Error in CV evaluation:', error);
-            throw error;
+            logger.error('Error stack:', error.stack);
+
+            // Return fallback with error info
+            const fallback = this.getFallbackCVScores(cvContent);
+            fallback.rag_status = 'failed';
+            fallback.rag_error = error.message;
+
+            return fallback;
         }
     }
 
@@ -54,19 +115,49 @@ class RAGService {
         try {
             logger.info('Starting project evaluation...');
 
+            // Check if vector store is initialized
+            const healthCheck = await vectorStoreUseCase.healthCheck();
+            logger.info('Vector store health:', healthCheck);
+
+            if (healthCheck.status !== 'healthy') {
+                throw new Error('Vector store is not healthy');
+            }
+
             // Retrieve case study brief context
+            logger.info('Searching case study brief context...');
             const caseStudyContext = await vectorStoreUseCase.searchContext(
                 'case study requirements implementation deliverables',
                 'case_study_brief',
                 null,
                 3
             );
+            logger.info(`Case study context found: ${caseStudyContext.length} results`);
+
+            if (caseStudyContext.length === 0) {
+                logger.warn('No case study context found!');
+            }
 
             // Retrieve project scoring rubric using helper method
+            logger.info('Searching project scoring rubric context...');
             const projectRubricContext = await vectorStoreUseCase.searchProjectScoringContext(
-                'project evaluation criteria code quality correctness resilience',
-                2
+                'project evaluation criteria code quality correctness resilience documentation',
+                3
             );
+            logger.info(`Project rubric context found: ${projectRubricContext.length} results`);
+
+            if (projectRubricContext.length === 0) {
+                logger.warn('No project rubric context found!');
+            }
+
+            // Check if we have enough context to proceed
+            const totalContextItems = caseStudyContext.length + projectRubricContext.length;
+
+            if (totalContextItems === 0) {
+                logger.error('CRITICAL: No context found from vector store!');
+                logger.error('Falling back to basic evaluation...');
+
+                return this.getFallbackProjectScores(projectContent);
+            }
 
             // Build context
             const context = this.buildContext([
@@ -74,24 +165,50 @@ class RAGService {
                 { title: 'Project Scoring Rubric', results: projectRubricContext }
             ]);
 
+            logger.info(`Built context length: ${context.length} characters`);
+
+            if (context.length < 100) {
+                logger.warn('Context too short, might not be useful for evaluation');
+            }
+
             // Build project summary
             const projectSummary = this.buildProjectSummary(projectContent);
+            logger.info(`Project summary length: ${projectSummary.length} characters`);
 
             // Generate evaluation prompt
             const prompt = this.buildProjectEvaluationPrompt(context, projectSummary);
+            logger.info(`Prompt length: ${prompt.length} characters`);
 
             // Get LLM evaluation
-            const evaluation = await llmService.generateTextWithRetry(prompt);
+            logger.info('Generating LLM evaluation...');
+            const evaluation = await llmService.generateTextWithRetry(prompt, {
+                maxTokens: 500,
+                temperature: 0.3
+            });
+
+            logger.info('LLM evaluation received');
+            logger.debug('LLM response preview:', evaluation.substring(0, 200));
 
             // Parse evaluation result
             const result = this.parseProjectEvaluation(evaluation, projectContent);
 
-            logger.info('Project evaluation completed');
+            // Add metadata
+            result.rag_status = 'success';
+            result.context_items_used = totalContextItems;
+
+            logger.info('Project evaluation completed successfully');
             return result;
 
         } catch (error) {
             logger.error('Error in project evaluation:', error);
-            throw error;
+            logger.error('Error stack:', error.stack);
+
+            // Return fallback with error info
+            const fallback = this.getFallbackProjectScores(projectContent);
+            fallback.rag_status = 'failed';
+            fallback.rag_error = error.message;
+
+            return fallback;
         }
     }
 
@@ -100,10 +217,17 @@ class RAGService {
         try {
             logger.info('Generating overall summary...');
 
+            // Check RAG status
+            const cvRagSuccess = cvResult.rag_status === 'success';
+            const projectRagSuccess = projectResult.rag_status === 'success';
+
+            logger.info(`CV RAG status: ${cvResult.rag_status}`);
+            logger.info(`Project RAG status: ${projectResult.rag_status}`);
+
             const prompt = `As an expert recruiter, provide a concise overall evaluation summary (3-5 sentences) for a ${jobTitle} candidate.
 
             CV Evaluation:
-            - Match Rate: ${cvResult.cv_match_rate}
+            - Match Rate: ${(cvResult.cv_match_rate * 100).toFixed(0)}%
             - Technical Skills: ${cvResult.cv_technical_skills_score}/5
             - Experience: ${cvResult.cv_experience_score}/5
 
@@ -111,6 +235,8 @@ class RAGService {
             - Overall Score: ${projectResult.project_score}/5
             - Code Quality: ${projectResult.project_code_quality_score}/5
             - Correctness: ${projectResult.project_correctness_score}/5
+
+            ${!cvRagSuccess || !projectRagSuccess ? 'Note: Some evaluations used fallback scoring due to RAG issues.' : ''}
 
             Provide:
             1. Overall assessment (strong/good/moderate/weak candidate)
@@ -120,14 +246,32 @@ class RAGService {
 
             Summary:`;
 
-            const summary = await llmService.generateTextWithRetry(prompt, { maxTokens: 300 });
+            const summary = await llmService.generateTextWithRetry(prompt, {
+                maxTokens: 300,
+                temperature: 0.5
+            });
 
             logger.info('Overall summary generated');
             return summary.trim();
 
         } catch (error) {
             logger.error('Error generating overall summary:', error);
-            throw error;
+
+            // Generate fallback summary
+            const cvRate = (cvResult.cv_match_rate * 100).toFixed(0);
+            const projectScore = projectResult.project_score;
+
+            let assessment = 'moderate';
+            if (cvResult.cv_match_rate >= 0.8 && projectScore >= 4.0) {
+                assessment = 'strong';
+            } else if (cvResult.cv_match_rate >= 0.7 && projectScore >= 3.5) {
+                assessment = 'good';
+            } else if (cvResult.cv_match_rate < 0.5 || projectScore < 3.0) {
+                assessment = 'weak';
+            }
+
+            return `Fallback evaluation completed. CV match rate: ${cvRate}%, Project score: ${projectScore}/5. ` +
+                `Overall assessment: ${assessment} candidate. Manual review recommended due to automated evaluation limitations.`;
         }
     }
 
@@ -361,7 +505,7 @@ class RAGService {
 
         return {
             cv_match_rate: 0.70,
-            cv_feedback: `CV contains ${skills.length} identified technical skills. Further evaluation needed.`,
+            cv_feedback: `CV contains ${skills.length} identified technical skills. Fallback evaluation used due to RAG failure.`,
             cv_technical_skills_score: technicalScore,
             cv_experience_score: 3.5,
             cv_achievements_score: 3.0,
@@ -372,14 +516,16 @@ class RAGService {
     // Fallback project scores
     getFallbackProjectScores(projectContent) {
         const qualityScore = this.estimateCodeQuality(projectContent);
+        const wordCount = projectContent.word_count || 0;
+        const codeBlocks = projectContent.extracted_data?.codeBlocks || 0;
 
         return {
-            project_score: 3.8,
-            project_feedback: `Project report is ${projectContent.word_count} words. Contains code examples and documentation.`,
-            project_correctness_score: 4.0,
+            project_score: Math.max(3.5, qualityScore),
+            project_feedback: `Project report contains ${codeBlocks} code blocks and ${wordCount} words. Fallback evaluation used.`,
+            project_correctness_score: 3.5,
             project_code_quality_score: qualityScore,
-            project_resilience_score: 3.5,
-            project_documentation_score: 4.0,
+            project_resilience_score: 3.0,
+            project_documentation_score: wordCount > 1000 ? 3.5 : 2.5,
             project_creativity_score: 3.0,
         };
     }
